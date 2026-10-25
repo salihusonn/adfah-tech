@@ -37,15 +37,17 @@ export default function LegalDialog({ type, onClose }) {
           <>
             <h3>Contact information</h3>
             <p>
-              This version of the AdFah Tech website does not store contact form submissions. When you
-              submit the form, the details you entered are used on your device to prepare a WhatsApp
-              message. You choose whether to send that message in WhatsApp.
+              When you submit the contact form, the details you enter are transmitted to Formspree for
+              processing and delivery to AdFah Tech. This may include your name, email address, optional
+              phone number, requested service, and project details. Please do not include passwords,
+              payment details, or other sensitive information in your enquiry.
             </p>
             <h3>External services</h3>
             <p>
-              Phone, email, and WhatsApp links open the relevant application or service. Your use of
-              those services is subject to their own privacy policies. No analytics or advertising
-              cookies are used by this website version.
+              Formspree processes form submissions according to its own privacy policy and may retain
+              submissions in the connected Formspree account. Phone, email, and WhatsApp links open the
+              relevant application or service, which also has its own privacy policy. No analytics or
+              advertising cookies are used by this website version.
             </p>
             <h3>Your choices</h3>
             <p>

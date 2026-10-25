@@ -32,9 +32,11 @@ The supplied Cloudinary portrait is preserved as the remote fallback URL in `src
 
 ## Contact form behavior
 
-No form backend or third-party form delivery service is configured. The form validates the required fields, then opens WhatsApp with a pre-filled enquiry. It clearly tells visitors that they must tap **Send** in WhatsApp; it never claims that a message was delivered automatically. No submission is stored by this website.
+The contact form is connected to the Formspree endpoint `https://formspree.io/f/mqppeegq`, stored in `src/data.js`. It validates the required fields and sends a JSON POST request to Formspree. A success confirmation is shown only after Formspree returns a successful response.
 
-To enable direct website delivery later, connect `src/components/ContactForm.jsx` to a secure server-side endpoint or a supported form service, add spam protection and rate limiting, and update the visible form notice and privacy policy.
+The form includes disabled/loading, success, server-error, network-error, and timeout states. If submission fails, the website clearly says the message was not sent and offers a pre-filled WhatsApp fallback. The form and privacy notice explain that submissions are processed by Formspree.
+
+Ensure the form is activated and email notifications are configured in the Formspree dashboard. Manage Formspree spam protection, submission retention, and notification settings in that account. No test submissions are included in the project.
 
 ## Updating portfolio and testimonials
 

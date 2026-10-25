@@ -4,6 +4,7 @@ export const BUSINESS = {
   email: 'aadamsalihu34@gmail.com',
   location: 'Maiduguri, Borno State, Nigeria',
   whatsapp: 'https://wa.me/2349028149646',
+  formspreeEndpoint: 'https://formspree.io/f/mqppeegq',
   imageUrl:
     'https://res.cloudinary.com/ip8oavcj/image/upload/Generated_Image_January_20_2026_-_9_23AM.png',
   localImage: '/images/adfah-tech.webp',

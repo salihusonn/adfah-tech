@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Info, Send } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, CircleAlert, Info, LoaderCircle, Send } from 'lucide-react';
 import { BUSINESS, SERVICES } from '../data';
 
 const initialForm = {
@@ -10,15 +10,37 @@ const initialForm = {
   details: '',
 };
 
+function createWhatsAppUrl(form) {
+  const message = [
+    `Hello ${BUSINESS.name},`,
+    '',
+    `My name is ${form.name.trim()}.`,
+    `Service required: ${form.service}`,
+    `Email: ${form.email.trim()}`,
+    `Phone: ${form.phone.trim() || 'Not provided'}`,
+    '',
+    'Project details:',
+    form.details.trim(),
+    '',
+    'Please let me know the next steps. Thank you.',
+  ].join('\n');
+
+  return `${BUSINESS.whatsapp}?text=${encodeURIComponent(message)}`;
+}
+
 export default function ContactForm({ selectedService }) {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
-  const [preparedUrl, setPreparedUrl] = useState('');
+  const [submission, setSubmission] = useState({ status: 'idle', message: '' });
+  const [fallbackUrl, setFallbackUrl] = useState('');
+  const isSubmitting = submission.status === 'submitting';
 
   useEffect(() => {
     if (selectedService) {
       setForm((current) => ({ ...current, service: selectedService }));
       setErrors((current) => ({ ...current, service: undefined }));
+      setSubmission({ status: 'idle', message: '' });
+      setFallbackUrl('');
     }
   }, [selectedService]);
 
@@ -26,7 +48,8 @@ export default function ContactForm({ selectedService }) {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
     setErrors((current) => ({ ...current, [name]: undefined }));
-    setPreparedUrl('');
+    setSubmission({ status: 'idle', message: '' });
+    setFallbackUrl('');
   };
 
   const validate = () => {
@@ -47,11 +70,14 @@ export default function ContactForm({ selectedService }) {
     return nextErrors;
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    if (isSubmitting) return;
+
     const nextErrors = validate();
     setErrors(nextErrors);
-    setPreparedUrl('');
+    setSubmission({ status: 'idle', message: '' });
+    setFallbackUrl('');
 
     if (Object.keys(nextErrors).length > 0) {
       const firstField = Object.keys(nextErrors)[0];
@@ -59,23 +85,62 @@ export default function ContactForm({ selectedService }) {
       return;
     }
 
-    const message = [
-      `Hello ${BUSINESS.name},`,
-      '',
-      `My name is ${form.name.trim()}.`,
-      `Service required: ${form.service}`,
-      `Email: ${form.email.trim()}`,
-      `Phone: ${form.phone.trim() || 'Not provided'}`,
-      '',
-      'Project details:',
-      form.details.trim(),
-      '',
-      'Please let me know the next steps. Thank you.',
-    ].join('\n');
+    const submittedForm = {
+      name: form.name.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      service: form.service,
+      details: form.details.trim(),
+    };
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
+    setSubmission({ status: 'submitting', message: 'Sending your message…' });
 
-    const url = `${BUSINESS.whatsapp}?text=${encodeURIComponent(message)}`;
-    setPreparedUrl(url);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    try {
+      const response = await fetch(BUSINESS.formspreeEndpoint, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: submittedForm.name,
+          email: submittedForm.email,
+          phone: submittedForm.phone || 'Not provided',
+          service: submittedForm.service,
+          project_details: submittedForm.details,
+          _subject: `New AdFah Tech website enquiry — ${submittedForm.service}`,
+        }),
+        signal: controller.signal,
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const serviceMessage =
+          result.errors?.map((item) => item.message).filter(Boolean).join(' ') ||
+          result.error ||
+          `The service returned an error (${response.status}).`;
+        throw new Error(serviceMessage);
+      }
+
+      setForm(initialForm);
+      setErrors({});
+      setSubmission({
+        status: 'success',
+        message: 'Thank you! Formspree has accepted your message for delivery to AdFah Tech.',
+      });
+    } catch (error) {
+      let reason = 'Please check your internet connection and try again.';
+      if (error.name === 'AbortError') {
+        reason = 'The request timed out. Please check your connection and try again.';
+      } else if (!(error instanceof TypeError) && error.message) {
+        reason = `Formspree could not accept the submission: ${error.message}`;
+      }
+      setSubmission({ status: 'error', message: `Your message was not sent. ${reason}` });
+      setFallbackUrl(createWhatsAppUrl(submittedForm));
+    } finally {
+      window.clearTimeout(timeout);
+    }
   };
 
   const fieldProps = (name) => ({
@@ -84,11 +149,11 @@ export default function ContactForm({ selectedService }) {
   });
 
   return (
-    <form className="contact-form" onSubmit={handleSubmit} noValidate>
+    <form className="contact-form" onSubmit={handleSubmit} noValidate aria-busy={isSubmitting}>
       <div className="contact-form__heading">
         <span>PROJECT ENQUIRY</span>
         <h3>Tell us about your idea</h3>
-        <p>Complete the fields below and continue through WhatsApp.</p>
+        <p>Complete the fields below and send your enquiry directly.</p>
       </div>
 
       <div className="form-grid">
@@ -103,6 +168,7 @@ export default function ContactForm({ selectedService }) {
             autoComplete="name"
             placeholder="Your full name"
             maxLength="100"
+            disabled={isSubmitting}
             required
             {...fieldProps('name')}
           />
@@ -121,6 +187,7 @@ export default function ContactForm({ selectedService }) {
             autoComplete="email"
             placeholder="you@example.com"
             maxLength="254"
+            disabled={isSubmitting}
             required
             {...fieldProps('email')}
           />
@@ -139,6 +206,7 @@ export default function ContactForm({ selectedService }) {
             autoComplete="tel"
             placeholder="Your phone number"
             maxLength="30"
+            disabled={isSubmitting}
             {...fieldProps('phone')}
           />
           {errors.phone && <span className="form-field__error" id="contact-phone-error">{errors.phone}</span>}
@@ -151,6 +219,7 @@ export default function ContactForm({ selectedService }) {
             name="service"
             value={form.service}
             onChange={updateField}
+            disabled={isSubmitting}
             required
             {...fieldProps('service')}
           >
@@ -173,6 +242,7 @@ export default function ContactForm({ selectedService }) {
             placeholder="Tell us what you would like to build, your goals, and any useful details..."
             rows="5"
             maxLength="2000"
+            disabled={isSubmitting}
             required
             {...fieldProps('details')}
           />
@@ -183,22 +253,38 @@ export default function ContactForm({ selectedService }) {
       <div className="form-notice">
         <Info size={19} aria-hidden="true" />
         <p>
-          Direct form delivery requires backend configuration, which is not connected in this version.
-          The button below prepares a WhatsApp message instead. Nothing is stored on this website, and
-          your message is not delivered until you tap <strong>Send</strong> in WhatsApp.
+          Your details are sent to <strong>Formspree</strong> for delivery to AdFah Tech. A success
+          confirmation appears only after Formspree accepts the submission. WhatsApp and email remain
+          available as alternative contact options.
         </p>
       </div>
 
-      <button type="submit" className="button button--primary contact-form__submit">
-        Send Message <Send size={18} aria-hidden="true" />
+      <button type="submit" className="button button--primary contact-form__submit" disabled={isSubmitting}>
+        {isSubmitting ? (
+          <>Sending Message… <LoaderCircle className="spinner" size={18} aria-hidden="true" /></>
+        ) : (
+          <>Send Message <Send size={18} aria-hidden="true" /></>
+        )}
       </button>
 
-      {preparedUrl && (
-        <div className="form-status" role="status">
-          <p>Your message is ready, but it has not been sent. Continue in WhatsApp and tap Send.</p>
-          <a href={preparedUrl} target="_blank" rel="noreferrer">
-            Continue to WhatsApp <ArrowUpRight size={16} aria-hidden="true" />
-          </a>
+      {submission.status === 'success' && (
+        <div className="form-status form-status--success" role="status">
+          <CheckCircle2 size={20} aria-hidden="true" />
+          <p>{submission.message}</p>
+        </div>
+      )}
+
+      {submission.status === 'error' && (
+        <div className="form-status form-status--error" role="alert">
+          <CircleAlert size={20} aria-hidden="true" />
+          <div>
+            <p>{submission.message}</p>
+            {fallbackUrl && (
+              <a href={fallbackUrl} target="_blank" rel="noreferrer">
+                Send this enquiry via WhatsApp instead <ArrowUpRight size={16} aria-hidden="true" />
+              </a>
+            )}
+          </div>
         </div>
       )}
     </form>
